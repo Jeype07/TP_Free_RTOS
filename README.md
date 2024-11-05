@@ -69,7 +69,23 @@ PRIORITY THAN THIS! (higher priorities are lower numeric values. */
 ```
 
 2)
+void StartDefaultTask(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Block for 100ms. */
+  const TickType_t xDelay = 100 / portTICK_PERIOD_MS;
 
+  /* Infinite loop */
+  for(;;)
+  {
+	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+	printf("LED Toggle\r\n");
+	vTaskDelay(xDelay);
+  }
+  /* USER CODE END 5 */
+}
+
+The macro portTICK_PERIOD_MS can be used to calculate real time from the tick rate - with the resolution of one tick period.
 ## 1.2 Sémaphores pour la synchronisation
 3)
 4)
