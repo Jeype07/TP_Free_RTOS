@@ -68,7 +68,7 @@ PRIORITY THAN THIS! (higher priorities are lower numeric values. */
 #define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY 5
 ```
 
-2)
+```C
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
@@ -86,6 +86,8 @@ void StartDefaultTask(void *argument)
 }
 
 The macro portTICK_PERIOD_MS can be used to calculate real time from the tick rate - with the resolution of one tick period.
+```
+
 ## 1.2 Sémaphores pour la synchronisation
 3)
 4)
