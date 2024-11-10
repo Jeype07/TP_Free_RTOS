@@ -22,7 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <semphr.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,8 +34,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define STACK_SIZE 1000
-#define DELAY 4
-
+#define DELAY_1000 1000
+#define DELAY_100 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,26 +46,22 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart2;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 128 * 4
-};
+osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
-
+SemaphoreHandle_t sem1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-void StartDefaultTask(void *argument);
+void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 void LED_Init(void);
 void task_switch_LED(void * pvParameters);
+void taskGive(void * pvParameters);
+void taskTake(void * pvParameters);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -77,16 +74,43 @@ int __io_putchar(int ch) {
 void LED_Init(){
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 }
+
 void task_switch_LED(void * pvParameters){
-	(void) pvParameters;
+	int count = 0;
 	/* Block for 100ms. */
-	const TickType_t xDelay = 100 / portTICK_PERIOD_MS;
+	const TickType_t xDelay = (TickType_t) DELAY_100 / portTICK_PERIOD_MS;
 	for(;;){
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		printf("LED Toggle\n");
+		printf("Count : %d\r\n", count);
+		count++;
 		vTaskDelay(xDelay);
 	}
 }
+
+void taskGive(void * pvParameters){
+	TickType_t xDelay = (TickType_t) DELAY_100 / portTICK_PERIOD_MS; //100ms
+	for(;;){
+		printf("Waiting to give the semaphore, Delay = %u\r\n", (unsigned int)xDelay);
+		xSemaphoreGive(sem1);
+		printf("Semaphore given\r\n");
+		vTaskDelay(xDelay);
+		xDelay += 100;
+	}
+}
+
+void taskTake(void * pvParameters){
+    for(;;){
+        printf("Waiting to take the semaphore\r\n");
+        if (xSemaphoreTake(sem1, ((TickType_t) DELAY_1000)) == pdTRUE){
+        	printf("Semaphore taken\r\n");
+    	}
+    	else {
+			printf("Failed to take semaphore, reset software\r\n");
+			NVIC_SystemReset(); // Reset the uC
+        }
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -120,11 +144,15 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  printf("==============START==============\r\n");
 
+  sem1 = xSemaphoreCreateBinary();
+  xTaskCreate(taskGive, "Give the semaphore each 100ms", STACK_SIZE, NULL, 1, NULL);
+  xTaskCreate(taskTake, "Take the semaphore", STACK_SIZE, NULL, 2, NULL);
+  xTaskCreate(task_switch_LED, "Toggle LED", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+
+  vTaskStartScheduler();	// démarre le sheduler = boucle infinie
   /* USER CODE END 2 */
-
-  /* Init scheduler */
-  osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -132,6 +160,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
+
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -143,16 +172,13 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* definition and creation of defaultTask */
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
   osKernelStart();
@@ -161,16 +187,9 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  /*BaseType_t xReturned;
-  TaskHandle_t xHandle1 = NULL;
-  xReturned = xTaskCreate(
-		  task_switch_LED,
-		  "LED_Toggle",
-		  STACK_SIZE,
-		  (void *) DELAY,
-		  tskIDLE_PRIORITY,
-		  &xHandle1);
-  vTaskStartScheduler();*/
+
+
+
 
   while (1)
   {
@@ -322,19 +341,13 @@ static void MX_GPIO_Init(void)
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Block for 100ms. */
-  const TickType_t xDelay = 100 / portTICK_PERIOD_MS;
-
   /* Infinite loop */
   for(;;)
   {
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-	printf("LED Toggle\r\n");
-	vTaskDelay(xDelay);
-    //osDelay(1);
+    osDelay(1);
   }
   /* USER CODE END 5 */
 }
