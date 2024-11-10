@@ -67,32 +67,118 @@ INTERRUPT SAFE FREERTOS API FUNCTIONS FROM ANY INTERRUPT THAT HAS A HIGHER
 PRIORITY THAN THIS! (higher priorities are lower numeric values. */
 #define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY 5
 ```
-
+2) Tache faisant clignoter la LED toutes les 100 ms
 ```C
-void StartDefaultTask(void *argument)
-{
-  /* USER CODE BEGIN 5 */
-  /* Block for 100ms. */
-  const TickType_t xDelay = 100 / portTICK_PERIOD_MS;
-
-  /* Infinite loop */
-  for(;;)
-  {
-	HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-	printf("LED Toggle\r\n");
-	vTaskDelay(xDelay);
-  }
-  /* USER CODE END 5 */
+#define STACK_SIZE 1000
+#define DELAY_1000 1000
+#define DELAY_100 100
+```
+```C
+void LED_Init(){
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 }
 
-The macro portTICK_PERIOD_MS can be used to calculate real time from the tick rate - with the resolution of one tick period.
+void task_switch_LED(void * pvParameters){
+	int count = 0;
+	/* Block for 100ms. */
+	const TickType_t xDelay = (TickType_t) DELAY_100 / portTICK_PERIOD_MS;
+	for(;;){
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+		printf("Count : %d\r\n", count);
+		count++;
+		vTaskDelay(xDelay);
+	}
+}
+```
+
+The macro portTICK_PERIOD_MS can be used to calculate real time from the tick rate - with the resolution of one tick period.  
+In the main loop  
+```C
+xTaskCreate(task_switch_LED, "Toggle LED", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+vTaskStartScheduler();	// démarre le sheduler = boucle infinie
 ```
 
 ## 1.2 Sémaphores pour la synchronisation
-3)
-4)
-5)
-6)
+3) taskGive et taskTake
+```C
+void taskGive(void * pvParameters){
+	const TickType_t xDelay = (TickType_t) DELAY_100 / portTICK_PERIOD_MS; //100ms
+	for(;;){
+		printf("Waiting to give the semaphore\r\n");
+		xSemaphoreGive(sem1);
+		printf("Semaphore given\r\n");
+		vTaskDelay(xDelay);
+	}
+}
+
+void taskTake(void * pvParameters){
+    for(;;){
+        printf("Waiting to take the semaphore\r\n");
+        xSemaphoreTake(sem1, ((TickType_t) DELAY_1));
+        printf("Semaphore taken\r\n");
+    }
+}
+```
+In the main loop : 
+```C
+sem1 = xSemaphoreCreateBinary();
+xTaskCreate(taskGive, "Give the semaphore each 100ms", STACK_SIZE, NULL, 1, NULL);
+xTaskCreate(taskTake, "Take the semaphore", STACK_SIZE, NULL, 2, NULL);
+xTaskCreate(task_switch_LED, "Toggle LED", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+
+vTaskStartScheduler();	// démarre le sheduler = boucle infinie
+```
+4) Mécanise de gestion d'erreur
+```C
+void taskTake(void * pvParameters){
+
+    for(;;){
+        printf("Waiting to take the semaphore\r\n");
+        if (xSemaphoreTake(sem1, ((TickType_t) DELAY_1)) == pdTRUE){
+        	printf("Semaphore taken\r\n");
+    	}
+    	else {
+			printf("Failed to take semaphore, reset software\r\n");
+			NVIC_SystemReset(); // Reset the uC
+        }
+    }
+}
+```
+5) Ajout de 100 ms à chaque itération pour valider la gestion d'erreur
+```C
+void taskGive(void * pvParameters){
+	TickType_t xDelay = ((TickType_t) DELAY_100 / portTICK_PERIOD_MS; //100ms
+	for(;;){
+		printf("Waiting to give the semaphore, Delay = %u\r\n", (unsigned int)xDelay);
+		xSemaphoreGive(sem1);
+		printf("Semaphore given\r\n");
+		vTaskDelay(xDelay);
+		xDelay += 100;
+	}
+}
+```
+6) Changment de priorités  
+Affichage pour taskeTake prioritaire sur TaskGive : 
+```C
+==============START==============
+Waiting to take the semaphore
+Waiting to give the semaphore, Delay = 100
+Semaphore taken
+Waiting to take the semaphore
+Semaphore given
+Waiting to give the semaphore, Delay = 200
+Semaphore taken
+Waiting to take the semaphore
+...
+...
+Waiting to take the semaphore
+Semaphore given
+Waiting to give the semaphore, Delay = 1000
+Semaphore taken
+Waiting to take the semaphore
+Semaphore given
+Failed to take semaphore, reset software
+```
 ## 1.3 Notification
 7)
 ## 1.4 Queues
