@@ -157,8 +157,8 @@ void taskGive(void * pvParameters){
 	}
 }
 ```
-6) Changment de priorités  
-Affichage pour taskeTake prioritaire sur TaskGive : 
+6) Changment de priorités
+- Affichage pour taskeTake prioritaire sur TaskGive : 
 ```C
 ==============START==============
 Waiting to take the semaphore
@@ -179,6 +179,44 @@ Waiting to take the semaphore
 Semaphore given
 Failed to take semaphore, reset software
 ```
+
+Ici, taskTake à la priorité donc on commence par attendre de prendre le sémaphore et on affiche "Waiting to take the semaphore".  
+Celui-ci n'a pas encore été donné donc taskTake passe en attente et taskGive s'active et on attends de donner le sémaphore, on affiche "Waiting to give the sempahore".  
+Le sémaphore est donné par taskGive, donc taskGive se bloque et taskTake est immédiatement débloquée pour prendre le sémaphore "Semaphore taken" (car taskTake est plus prioritaire). 
+taskGive n'a donc pas le temps d'afficher "Semaphore given".  
+La boucle while de taskTake recommence et on attends de nouveau de prendre le sémaphore "Waiting to take the semaphore", donc taskTake passe en attente.  
+taskGive se débloque et peut enfin afficher "Sémaphore given".
+La boucle while de task give recommence "Waiting to give the semaphore".  
+Puis taskGive donne le sémaphore et débloque taskTake "Semaphore taken".  
+Et ainsi de suite... 
+  
+- Affichage pour taskeGive prioritaire sur TaskTake :  
+```C
+Waiting to give the semaphore, Delay = 100
+Semaphore given
+Waiting to take the semaphore
+Semaphore taken
+Waiting to take the semaphore
+Waiting to give the semaphore, Delay = 200
+Semaphore given
+Semaphore taken
+Waiting to take the semaphore
+Waiting to give the semaphore, Delay = 300
+...
+...
+Waiting to give the semaphore, Delay = 1100
+Semaphore given
+Semaphore taken
+Waiting to take the semaphore
+Failed to take semaphore, reset software
+```
+Dans ce cas task give est prioritaire donc on commence par attendre de donner le semaphore "waiting to give the semaphore", puis on le donne.
+La tache ne bloque pas tout de suite car taskGive est prioritaire, donc la boucle continue et on affiche "semaphore given".  
+taskGive se bloque à cause du vTaskDelay, et on taskTake se lance, on attends de prendre le semaphore " Waiting to the take the semaphore", puis on le prend car il a déjà été donné auparavant, puis on affiche "semaphore taken". 
+la boucle while de taskTake recommence et on essaye de prendre le semaphore "waiting to take the semaphore",  
+mais celui-ci n'a pas encore été donné donc taskTake se bloque et on passe dans taskGive. On attends de donner le semaphore "Waiting to give the semaphore", puis on le donne mais on reste dans taskGive car prioritaire.  
+Ensuite vTaskDelay bloque tasgive, et taskTake se lance.
+et ainsi de suite... 
 ## 1.3 Notification
 7)
 ## 1.4 Queues
