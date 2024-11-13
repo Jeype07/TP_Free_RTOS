@@ -49,6 +49,8 @@ UART_HandleTypeDef huart2;
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 SemaphoreHandle_t sem1;
+TaskHandle_t h_task_notify = NULL;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -90,9 +92,12 @@ void task_switch_LED(void * pvParameters){
 void taskGive(void * pvParameters){
 	TickType_t xDelay = (TickType_t) DELAY_100 / portTICK_PERIOD_MS; //100ms
 	for(;;){
-		printf("Waiting to give the semaphore, Delay = %u\r\n", (unsigned int)xDelay);
+		/*printf("Waiting to give the semaphore, Delay = %u\r\n", (unsigned int)xDelay);
 		xSemaphoreGive(sem1);
-		printf("Semaphore given\r\n");
+		printf("Semaphore given\r\n");*/
+		printf("Waiting to notify, Delay = %u\r\n", (unsigned int)xDelay);
+		xTaskNotifyGive(h_task_notify);
+		printf("Notification sent\r\n");
 		vTaskDelay(xDelay);
 		xDelay += 100;
 	}
@@ -100,14 +105,22 @@ void taskGive(void * pvParameters){
 
 void taskTake(void * pvParameters){
     for(;;){
-        printf("Waiting to take the semaphore\r\n");
+        /*printf("Waiting to take the semaphore\r\n");
         if (xSemaphoreTake(sem1, ((TickType_t) DELAY_1000)) == pdTRUE){
         	printf("Semaphore taken\r\n");
     	}
     	else {
 			printf("Failed to take semaphore, reset software\r\n");
 			NVIC_SystemReset(); // Reset the uC
-        }
+        }*/
+    	printf("Waiting to get notified\r\n");
+    	if (ulTaskNotifyTake(pdTRUE, (TickType_t) DELAY_1000) == pdTRUE ){
+    		printf("Notification received\r\n");
+    	}
+    	else{
+    		printf("Failed to receive the notification, reset software\r\n");
+			NVIC_SystemReset(); // Reset the uC
+    	}
     }
 }
 
@@ -147,8 +160,8 @@ int main(void)
   printf("==============START==============\r\n");
 
   sem1 = xSemaphoreCreateBinary();
-  xTaskCreate(taskGive, "Give the semaphore each 100ms", STACK_SIZE, NULL, 1, NULL);
-  xTaskCreate(taskTake, "Take the semaphore", STACK_SIZE, NULL, 2, NULL);
+  xTaskCreate(taskGive, "Give the semaphore each 100ms", STACK_SIZE, NULL, 2,&h_task_notify);
+  xTaskCreate(taskTake, "Take the semaphore", STACK_SIZE, NULL, 1, &h_task_notify);
   xTaskCreate(task_switch_LED, "Toggle LED", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
   vTaskStartScheduler();	// démarre le sheduler = boucle infinie
