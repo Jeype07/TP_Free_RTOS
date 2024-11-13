@@ -218,7 +218,58 @@ mais celui-ci n'a pas encore été donné donc taskTake se bloque et on passe da
 Ensuite vTaskDelay bloque tasgive, et taskTake se lance.
 et ainsi de suite... 
 ## 1.3 Notification
-7)
+7) Nous modifiions maintenanant le code pour obtenir le même fonctionnement en utilisant des task
+notifications à la place des sémaphores.
+
+```C
+TaskHandle_t h_task_notify = NULL;
+
+void taskGive(void * pvParameters){
+	TickType_t xDelay = (TickType_t) DELAY_100 / portTICK_PERIOD_MS; //100ms
+	for(;;){
+		/*printf("Waiting to give the semaphore, Delay = %u\r\n", (unsigned int)xDelay);
+		xSemaphoreGive(sem1);
+		printf("Semaphore given\r\n");*/
+		printf("Waiting to notify, Delay = %u\r\n", (unsigned int)xDelay);
+		xTaskNotifyGive(h_task_notify);
+		printf("Notification sent\r\n");
+		vTaskDelay(xDelay);
+		xDelay += 100;
+	}
+}
+
+void taskTake(void * pvParameters){
+    for(;;){
+        /*printf("Waiting to take the semaphore\r\n");
+        if (xSemaphoreTake(sem1, ((TickType_t) DELAY_1000)) == pdTRUE){
+        	printf("Semaphore taken\r\n");
+    	}
+    	else {
+			printf("Failed to take semaphore, reset software\r\n");
+			NVIC_SystemReset(); // Reset the uC
+        }*/
+    	printf("Waiting to get notified\r\n");
+    	if (ulTaskNotifyTake(pdTRUE, (TickType_t) DELAY_1000) == pdTRUE ){
+    		printf("Notification received\r\n");
+    	}
+    	else{
+    		printf("Failed to receive the notification, reset software\r\n");
+			NVIC_SystemReset(); // Reset the uC
+    	}
+    }
+}
+```
+Dans la boucle main():
+```C
+  printf("==============START==============\r\n");
+
+  sem1 = xSemaphoreCreateBinary();
+  xTaskCreate(taskGive, "Send a notification each 100ms", STACK_SIZE, NULL, 2,&h_task_notify);
+  xTaskCreate(taskTake, "Receive the notification", STACK_SIZE, NULL, 1, &h_task_notify);
+  xTaskCreate(task_switch_LED, "Toggle LED", STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+
+  vTaskStartScheduler();
+```
 ## 1.4 Queues
 8)
 ## 1.5 Réentrance et exclusion mutuelle
